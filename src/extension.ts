@@ -14,10 +14,12 @@ import { spawnCli } from './cli';
  *  - The extension activates on `onLanguage:kuml` — i.e. the first time a
  *    `*.kuml.kts` file is opened. That's also when language + grammar +
  *    snippets become active, and when the LSP client starts.
- *  - Runtime commands: `kuml.renderToSvg` (one-shot render; SVG routes into
- *    the live-preview panel, PNG opens in the OS viewer), `kuml.showPreview`
- *    (opens/reveals the live-preview webview), and `kuml.restartServer`
- *    (stops and recreates the LSP client).
+ *  - Runtime commands: `kuml.renderToSvg` (one-shot render honoring the
+ *    `kuml.format` setting; SVG routes into the live-preview panel, PNG opens
+ *    in the OS viewer), `kuml.showPreview` (opens/reveals the live-preview
+ *    webview), `kuml.exportPng` (one-shot render that always forces PNG,
+ *    regardless of `kuml.format` — the toolbar's dedicated PNG-export
+ *    button), and `kuml.restartServer` (stops and recreates the LSP client).
  *  - The LSP server (`kuml-lsp`) is render-agnostic — diagnostics and
  *    completion only. Live preview rendering is entirely a client-side
  *    concern (see `previewPanel.ts`'s dual server/CLI strategy).
@@ -31,8 +33,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push({ dispose: () => void stopClient(client) });
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('kuml.renderToSvg', renderActiveDocument),
+        vscode.commands.registerCommand('kuml.renderToSvg', () => renderActiveDocument()),
         vscode.commands.registerCommand('kuml.showPreview', () => KumlPreviewPanel.show(context)),
+        vscode.commands.registerCommand('kuml.exportPng', () => renderActiveDocument('png')),
         vscode.commands.registerCommand('kuml.restartServer', () => restartServer(context)),
     );
 
@@ -65,8 +68,12 @@ async function restartServer(context: vscode.ExtensionContext): Promise<void> {
  *  - `format === 'svg'`: delegate to the live-preview panel (replaces the old
  *    open-in-tab flow).
  *  - `format === 'png'`: keep the original temp-file spawn + OS-viewer open.
+ *
+ * @param forcedFormat When set, overrides the `kuml.format` setting — used by
+ *   the dedicated `kuml.exportPng` command so it always exports PNG
+ *   regardless of the configured default format.
  */
-async function renderActiveDocument(): Promise<void> {
+async function renderActiveDocument(forcedFormat?: 'svg' | 'png'): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor || editor.document.languageId !== 'kuml') {
         await vscode.window.showWarningMessage('Open a *.kuml.kts file before running this command.');
@@ -74,7 +81,7 @@ async function renderActiveDocument(): Promise<void> {
     }
 
     const config = vscode.workspace.getConfiguration('kuml');
-    const format = config.get<string>('format', 'svg');
+    const format = forcedFormat ?? config.get<string>('format', 'svg');
 
     if (format === 'svg') {
         await vscode.commands.executeCommand('kuml.showPreview');

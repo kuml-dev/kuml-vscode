@@ -2,6 +2,35 @@
 
 All notable changes to the kUML VS Code extension are documented in this file.
 
+## [0.3.0] — 2026-07-20
+
+Toolbar icons, PNG export, and live-preview zoom controls.
+
+### Added
+- New command **kUML: Export to PNG** (`kuml.exportPng`) — always exports PNG
+  regardless of the `kuml.format` setting; joins **Open Live Preview** and
+  **Render to SVG** as a dedicated editor-title icon button, editor-context
+  menu entry, and command-palette entry.
+- Live-preview panel gained a **Zoom In / Zoom Out / Zoom Fit** toolbar
+  (inline stroke-based SVG icons, no bundled icon font). Zoom is a simple
+  CSS `transform: scale(...)` on the rendered SVG (clamped 0.1×–8×, 1.2×
+  per step); Zoom Fit resets to the default responsive fit.
+
+### Changed
+- The **Open Live Preview**, **Render to SVG**, and **Export to PNG** editor
+  commands now render as icon buttons (VS Code's `$(codicon-id)` command
+  icon syntax) instead of text labels in the editor title bar.
+
+### Security
+- The live-preview webview now runs with `enableScripts: true` (previously
+  `false`), required for the new zoom toolbar. The CSP now scopes
+  `script-src` to a single per-render nonce (`script-src 'nonce-<random>'`),
+  so only the panel's own inline zoom script can execute — no remote scripts,
+  no `postMessage`/`acquireVsCodeApi` channel back to the extension host.
+  `sanitizeSvg` (unconditionally strips `<script>`, event handler attributes,
+  and non-`data:`/non-`#` `href`s from rendered SVG) remains as
+  defense-in-depth on top of the CSP, independently of the scripting change.
+
 ## [0.2.0] — 2026-07-10
 
 Wave 5: thin LSP client + live-preview webview.

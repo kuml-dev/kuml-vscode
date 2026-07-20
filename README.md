@@ -16,14 +16,20 @@ First-class editor support for [kUML](https://kuml.dev) diagram scripts
 - **One-click render** via the **kUML: Render to SVG** command — invokes the
   `kuml` CLI. PNG output opens in your OS viewer; SVG output opens in the
   live-preview panel (see below).
+- **kUML: Export to PNG** — always exports PNG (regardless of the
+  `kuml.format` setting) and opens it in your OS's default image viewer.
 - **Diagnostics + completion** via the `kuml-lsp` language server — parse and
   validation errors are pushed as you type (debounced), and completion
   (including resolve) is available for DSL builders and identifiers.
 - **kUML: Open Live Preview** — a persistent webview panel that renders the
   active document as sanitized inline SVG and re-renders automatically on save
-  and when you switch to another `*.kuml.kts` editor tab.
+  and when you switch to another `*.kuml.kts` editor tab. The panel has its
+  own **Zoom In / Zoom Out / Zoom Fit** toolbar for inspecting large diagrams.
 - **kUML: Restart Language Server** — stops and relaunches `kuml-lsp` without
   reloading the whole extension host window.
+- The **Open Live Preview**, **Render to SVG**, and **Export to PNG**
+  commands also appear as icon buttons in the editor title bar and the editor
+  context menu when a `*.kuml.kts` file is active.
 
 ## Requirements
 
@@ -52,8 +58,9 @@ The **kUML: Open Live Preview** panel renders via two strategies, in order:
    any reason, the panel shells out to `kuml render` against a temp-file
    snapshot of the buffer (works for unsaved/dirty documents too).
 
-Only SVG is inlined into the webview; PNG output from `kuml.renderToSvg`
-still opens in your OS's default image viewer.
+Only SVG is inlined into the webview; PNG output from `kuml.renderToSvg` (or
+the dedicated `kuml.exportPng` command) still opens in your OS's default
+image viewer.
 
 ## Settings
 

@@ -2,7 +2,7 @@
   "name": "kuml-vscode",
   "displayName": "kUML",
   "description": "Syntax highlighting, snippets, LSP diagnostics/completion, and live-preview rendering for kUML diagram scripts (*.kuml.kts).",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "kuml-dev",
   "license": "Apache-2.0",
   "homepage": "https://kuml.dev",
@@ -62,14 +62,22 @@
     ],
     "commands": [
       {
-        "command": "kuml.renderToSvg",
-        "title": "kUML: Render to SVG",
-        "category": "kUML"
-      },
-      {
         "command": "kuml.showPreview",
         "title": "kUML: Open Live Preview",
-        "category": "kUML"
+        "category": "kUML",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "kuml.renderToSvg",
+        "title": "kUML: Render to SVG",
+        "category": "kUML",
+        "icon": "$(export)"
+      },
+      {
+        "command": "kuml.exportPng",
+        "title": "kUML: Export to PNG",
+        "category": "kUML",
+        "icon": "$(file-media)"
       },
       {
         "command": "kuml.restartServer",
@@ -81,25 +89,35 @@
       "editor/title": [
         {
           "when": "resourceLangId == kuml",
-          "command": "kuml.renderToSvg",
-          "group": "navigation"
+          "command": "kuml.showPreview",
+          "group": "navigation@1"
         },
         {
           "when": "resourceLangId == kuml",
-          "command": "kuml.showPreview",
-          "group": "navigation"
+          "command": "kuml.renderToSvg",
+          "group": "navigation@2"
+        },
+        {
+          "when": "resourceLangId == kuml",
+          "command": "kuml.exportPng",
+          "group": "navigation@3"
         }
       ],
       "editor/context": [
         {
           "when": "resourceLangId == kuml",
-          "command": "kuml.renderToSvg",
+          "command": "kuml.showPreview",
           "group": "kuml@1"
         },
         {
           "when": "resourceLangId == kuml",
-          "command": "kuml.showPreview",
+          "command": "kuml.renderToSvg",
           "group": "kuml@2"
+        },
+        {
+          "when": "resourceLangId == kuml",
+          "command": "kuml.exportPng",
+          "group": "kuml@3"
         }
       ],
       "commandPalette": [
@@ -109,6 +127,10 @@
         },
         {
           "command": "kuml.showPreview",
+          "when": "resourceLangId == kuml"
+        },
+        {
+          "command": "kuml.exportPng",
           "when": "resourceLangId == kuml"
         },
         {

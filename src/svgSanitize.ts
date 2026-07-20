@@ -1,11 +1,12 @@
 /**
  * Sanitizes a `kuml render`-produced SVG string before it is inlined into the
- * live-preview webview. This is defense-in-depth on top of the webview's own
- * `enableScripts: false` + strict CSP — the SVG is a static asset, not
- * attacker-controlled input in the usual sense (it comes from the local CLI
- * or a locally-configured `kuml.serverUrl`), but stripping active content
- * keeps the preview safe even if a future renderer regression, plugin, or
- * theme accidentally emits something it shouldn't.
+ * live-preview webview. This is defense-in-depth on top of the webview's
+ * nonce-scoped CSP (`script-src 'nonce-<random>'` — only the panel's own
+ * inline zoom-toolbar script can run, see `previewPanel.ts`) — the SVG is a
+ * static asset, not attacker-controlled input in the usual sense (it comes
+ * from the local CLI or a locally-configured `kuml.serverUrl`), but stripping
+ * active content keeps the preview safe even if a future renderer
+ * regression, plugin, or theme accidentally emits something it shouldn't.
  *
  * No `vscode` import here — kept pure so it's unit-testable in plain Node.
  */
