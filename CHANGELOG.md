@@ -2,6 +2,24 @@
 
 All notable changes to the kUML VS Code extension are documented in this file.
 
+## [0.3.1] — 2026-07-21
+
+Internal/tooling only — no user-facing changes.
+
+### Changed
+- Verifies the new `.github/workflows/release.yml` (added after the v0.3.0
+  tag, so it never actually ran) — this release is the first tag pushed
+  since the workflow existed on `master`, confirming that a `v*.*.*` tag
+  push builds, tests, packages, publishes to the Marketplace via the
+  `VSCE_PAT` repo secret, and creates the GitHub Release automatically.
+
+### Fixed
+- `src/test/manifest.test.ts` had a hardcoded `assert.equal(version, '0.2.0')`
+  left over from the 0.2.0 wave — broke `npm test` on every subsequent
+  version bump (silently missed at the 0.3.0 release since the failing test
+  scrolled past a truncated terminal check). Replaced with a semver-shape
+  assertion that stays valid across releases.
+
 ## [0.3.0] — 2026-07-20
 
 Toolbar icons, PNG export, and live-preview zoom controls.

@@ -105,8 +105,11 @@ test('manifest declares a PNG marketplace icon that exists on disk', () => {
     assert.ok(fs.existsSync(path.join(ROOT, icon!)), `icon file ${icon} must exist on disk`);
 });
 
-test('manifest version is bumped to 0.2.0 for the LSP client + live-preview wave', () => {
-    assert.equal(MANIFEST.version, '0.2.0');
+test('manifest version is valid semver', () => {
+    // Was a hardcoded `assert.equal(MANIFEST.version, '0.2.0')` — broke on every
+    // subsequent version bump (caught again at the 0.3.1 release). A shape check
+    // is what this test can actually keep enforcing release over release.
+    assert.match(MANIFEST.version as string, /^\d+\.\d+\.\d+$/);
 });
 
 test('vscode-languageclient is declared as a runtime dependency', () => {

@@ -2,7 +2,7 @@
   "name": "kuml-vscode",
   "displayName": "kUML",
   "description": "Syntax highlighting, snippets, LSP diagnostics/completion, and live-preview rendering for kUML diagram scripts (*.kuml.kts).",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "kuml-dev",
   "license": "Apache-2.0",
   "homepage": "https://kuml.dev",
