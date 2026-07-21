@@ -1,0 +1,80 @@
+name: Release
+
+# Triggers on annotated version tags (v0.X.Y), pushed after the local
+# squash-merge-to-master workflow described in the kuml-dev CLAUDE.md
+# conventions. Builds the VSIX, publishes it to the VS Code Marketplace, and
+# creates/updates the matching GitHub Release with the VSIX attached.
+#
+# Idempotent by design (safe to re-run on failure):
+#   - Marketplace publish is skipped if the Marketplace already has this
+#     version (vsce show).
+#   - GitHub Release is created if missing, or updated in place if it
+#     already exists (mirrors the create-or-update pattern used by
+#     kuml-dev/kUML's own release.yml).
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Run tests
+        run: npm test
+
+      - name: Package VSIX
+        run: npm run package
+
+      - name: Resolve version + VSIX filename
+        id: meta
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "vsix=kuml-vscode-$VERSION.vsix" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether this version is already on the Marketplace
+        id: check
+        run: |
+          PUBLISHED="$(npx vsce show kuml-dev.kuml-vscode --json 2>/dev/null \
+            | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{console.log(JSON.parse(d).versions[0].version)}catch(e){console.log('')}})")"
+          echo "published=$PUBLISHED" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to VS Code Marketplace
+        if: steps.check.outputs.published != steps.meta.outputs.version
+        run: npx vsce publish --packagePath "${{ steps.meta.outputs.vsix }}" --pat "$VSCE_PAT"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Skip notice (already published)
+        if: steps.check.outputs.published == steps.meta.outputs.version
+        run: echo "::notice::v${{ steps.meta.outputs.version }} is already on the Marketplace, skipping publish."
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${{ steps.meta.outputs.vsix }}" --clobber
+          else
+            gh release create "$TAG" "${{ steps.meta.outputs.vsix }}" \
+              --title "$TAG" \
+              --notes "See CHANGELOG.md for details."
+          fi
