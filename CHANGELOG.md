@@ -2,6 +2,30 @@
 
 All notable changes to the kUML VS Code extension are documented in this file.
 
+## [0.3.3] — 2026-08-01
+
+Dependency security bumps — no user-facing functional changes.
+
+### Security
+- GitHub flagged 5 high-severity Dependabot alerts on `master` after the 0.3.2 push
+  (`js-yaml`, `fast-uri` ×2, `linkify-it`, `brace-expansion`). All five were transitive
+  dependencies of `@vscode/vsce` (the packaging CLI, a devDependency) — none reach the
+  packaged VSIX. While tracing the `brace-expansion` chain, found a *separate*,
+  previously unflagged advisory
+  ([GHSA-mh99-v99m-4gvg](https://github.com/advisories/GHSA-mh99-v99m-4gvg), DoS via
+  unbounded expansion length) affecting `brace-expansion@2.1.2` under
+  `vscode-languageclient`'s own `minimatch` — `vscode-languageclient` **is** a
+  production dependency, so this instance does ship in the packaged extension. Also
+  picked up two more `npm audit` findings not in the original Dependabot batch
+  (`form-data`, `undici`), both dev-only via `@vscode/vsce`.
+  Added scoped `overrides` in `package.json` pinning each to the first patched version
+  satisfying its parent's declared semver range: `js-yaml@^4.3.0`, `fast-uri@^3.1.4`,
+  `linkify-it@^5.0.2`, `form-data@^4.0.6`, `undici@^7.28.0`, and two path-scoped
+  `brace-expansion` overrides (`^5.0.7` under `@vscode/vsce`'s `minimatch`, `^2.1.3`
+  under `vscode-languageclient`'s `minimatch`, so the two unrelated major-version
+  lineages aren't collapsed into one). `npm audit` now reports 0 vulnerabilities;
+  `npm test` still 25/25 green.
+
 ## [0.3.2] — 2026-08-01
 
 Marketplace listing icon and a test-isolation fix — no user-facing functional changes.

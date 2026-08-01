@@ -2,7 +2,7 @@
   "name": "kuml-vscode",
   "displayName": "kUML",
   "description": "Syntax highlighting, snippets, LSP diagnostics/completion, and live-preview rendering for kUML diagram scripts (*.kuml.kts).",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publisher": "kuml-dev",
   "license": "Apache-2.0",
   "homepage": "https://kuml.dev",
@@ -197,5 +197,23 @@
     "@types/vscode": "^1.85.0",
     "typescript": "^5.4.0",
     "@vscode/vsce": "^3.0.0"
+  },
+  "_comment_overrides": "Transitive-dependency security bumps, pinned to the first patched version satisfying each parent's declared semver range; see CHANGELOG. js-yaml/fast-uri/linkify-it/form-data/undici and @vscode/vsce's own minimatch->brace-expansion are all inside @vscode/vsce's (dev-only) tree, never shipped in the packaged VSIX. vscode-languageclient's minimatch->brace-expansion IS shipped (vscode-languageclient is a production dependency) and had its own, separate CVE (GHSA-mh99-v99m-4gvg) at 2.1.2 — that one is the actual runtime-relevant fix here.",
+  "overrides": {
+    "js-yaml": "^4.3.0",
+    "fast-uri": "^3.1.4",
+    "linkify-it": "^5.0.2",
+    "form-data": "^4.0.6",
+    "undici": "^7.28.0",
+    "@vscode/vsce": {
+      "minimatch": {
+        "brace-expansion": "^5.0.7"
+      }
+    },
+    "vscode-languageclient": {
+      "minimatch": {
+        "brace-expansion": "^2.1.3"
+      }
+    }
   }
 }
