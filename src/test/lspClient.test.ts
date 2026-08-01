@@ -100,7 +100,14 @@ test('resolveLspLauncher finds a local Gradle installDist build by walking up fr
         const originalEnv = process.env.KUML_LSP;
         delete process.env.KUML_LSP;
         try {
-            const resolved = resolveLspLauncher({ lspPath: '', workspaceDirs: [subDir] });
+            const resolved = resolveLspLauncher({
+                lspPath: '',
+                workspaceDirs: [subDir],
+                // Skip the PATH / common-install-location probes: this machine
+                // has a real Homebrew kuml-lsp at /opt/homebrew/bin/kuml-lsp,
+                // which would otherwise win before the walk-up ever runs.
+                probeSystem: false,
+            });
             assert.equal(resolved, exe);
         } finally {
             if (originalEnv !== undefined) {
@@ -115,15 +122,53 @@ test('resolveLspLauncher falls back to the bare launcher name when nothing resol
         const originalEnv = process.env.KUML_LSP;
         delete process.env.KUML_LSP;
         try {
-            // An empty, otherwise-unrelated workspace dir with no installDist tree,
-            // and `kuml-lsp` is not installed anywhere on this dev machine (PATH,
-            // Homebrew, ~/.local/bin) — verified manually. So resolution must
-            // exhaust every strategy and return the documented last resort: the
-            // bare launcher name, so ServerOptions still tries a PATH lookup at
-            // spawn time.
-            const resolved = resolveLspLauncher({ lspPath: '', workspaceDirs: [dir] });
+            // An empty, otherwise-unrelated workspace dir with no installDist
+            // tree. `probeSystem: false` skips the PATH probe and the hardcoded
+            // common install locations, so the outcome no longer depends on
+            // whether kuml-lsp happens to be installed on the machine running
+            // the tests (it is, via Homebrew, on at least one dev box — which
+            // is exactly what used to break this test). What remains under test
+            // is the documented last resort: the bare launcher name, so
+            // ServerOptions still tries a PATH lookup at spawn time.
+            //
+            // The walk-up from an isolated mkdtempSync dir climbs to the fs
+            // root; a stray `kuml-language-server/build/install/kuml-lsp/bin/`
+            // tree in an ancestor of os.tmpdir() would shadow this, which is
+            // implausible under /var/folders (and bounded by MAX_WALK_UP_DEPTH).
+            const resolved = resolveLspLauncher({
+                lspPath: '',
+                workspaceDirs: [dir],
+                probeSystem: false,
+            });
             assert.equal(resolved, launcherName());
         } finally {
+            if (originalEnv !== undefined) {
+                process.env.KUML_LSP = originalEnv;
+            }
+        }
+    });
+});
+
+test('resolveLspLauncher still probes PATH by default (probeSystem defaults to true)', { skip: process.platform === 'win32' ? 'PATHEXT/where semantics differ on win32' : false }, () => {
+    withTempDir((dir) => {
+        const exe = path.join(dir, launcherName());
+        makeExecutable(exe);
+
+        const originalEnv = process.env.KUML_LSP;
+        const originalPath = process.env.PATH;
+        delete process.env.KUML_LSP;
+        process.env.PATH = `${dir}${path.delimiter}${originalPath ?? ''}`;
+        try {
+            // probeSystem intentionally omitted — the default must keep step 3
+            // (the `which` lookup) active, which is how most users get resolved.
+            const resolved = resolveLspLauncher({ lspPath: '', workspaceDirs: [] });
+            assert.equal(resolved, exe);
+        } finally {
+            if (originalPath === undefined) {
+                delete process.env.PATH;
+            } else {
+                process.env.PATH = originalPath;
+            }
             if (originalEnv !== undefined) {
                 process.env.KUML_LSP = originalEnv;
             }

@@ -23,6 +23,10 @@ import * as path from 'path';
  *
  * If nothing resolves, the bare launcher name is returned as a last resort so
  * `ServerOptions` still attempts to spawn it via the shell's own PATH lookup.
+ *
+ * Steps 3 and 4 are skipped when `LspLauncherConfig.probeSystem === false`.
+ * That flag exists purely so unit tests can reach steps 5/6 on a machine that
+ * has a real `kuml-lsp` installed; production callers leave it unset (= true).
  */
 
 export interface LspLauncherConfig {
@@ -30,6 +34,19 @@ export interface LspLauncherConfig {
     lspPath?: string;
     /** Workspace folder roots to walk up from, looking for a local Gradle build. */
     workspaceDirs: string[];
+    /**
+     * Test-only escape hatch. When `false`, steps 3 and 4 of the resolution
+     * order (the `which`/`where` PATH probe and the hardcoded common install
+     * locations) are skipped, so a unit test can exercise steps 5 and 6 — the
+     * local Gradle installDist walk-up and the bare-name last resort —
+     * deterministically, even on a developer machine that has a real
+     * `kuml-lsp` installed (e.g. via Homebrew in `/opt/homebrew/bin`).
+     *
+     * Defaults to `true`. The only production caller (`createClient` in
+     * `src/lspClient.ts`) never sets it, so real resolution behavior is
+     * unchanged. Do not set this from production code.
+     */
+    probeSystem?: boolean;
 }
 
 /** Relative path segments of the LSP launcher inside a Gradle `installDist` output. */
@@ -54,14 +71,18 @@ export function resolveLspLauncher(config: LspLauncherConfig): string {
         return configured;
     }
 
-    const onPathResult = resolveOnPath(launcher);
-    if (onPathResult) {
-        return onPathResult;
-    }
+    const probeSystem = config.probeSystem ?? true;
 
-    const common = commonLocations(launcher).find(isUsable);
-    if (common) {
-        return common;
+    if (probeSystem) {
+        const onPathResult = resolveOnPath(launcher);
+        if (onPathResult) {
+            return onPathResult;
+        }
+
+        const common = commonLocations(launcher).find(isUsable);
+        if (common) {
+            return common;
+        }
     }
 
     for (const dir of config.workspaceDirs) {

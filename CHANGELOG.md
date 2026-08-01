@@ -4,9 +4,18 @@ All notable changes to the kUML VS Code extension are documented in this file.
 
 ## [0.3.2] — 2026-08-01
 
-Marketplace listing icon only — no functional changes.
+Marketplace listing icon and a test-isolation fix — no user-facing functional changes.
 
 ### Fixed
+- Two `src/test/lspClient.test.ts` cases (local Gradle installDist walk-up,
+  bare-launcher-name fallback) failed on any machine with a real `kuml-lsp`
+  installed — they assumed it was installed nowhere, so `resolveLspLauncher`'s
+  PATH probe and hardcoded common-install-location probe resolved first and the
+  code paths under test were never reached. `LspLauncherConfig` gained an
+  optional, test-only `probeSystem` flag (default `true`) that skips those two
+  probe steps; the tests now pass `probeSystem: false`. Production resolution
+  order and behavior are unchanged — the sole production caller never sets it —
+  and a new test asserts the default still probes PATH.
 - The Marketplace listing showed a generic "kU" script glyph instead of the
   kUML brand logo. `icons/kuml-marketplace.png` had been rasterized from
   `icons/kuml-script-dark.svg` — the 16×16 file-type icon meant solely for
