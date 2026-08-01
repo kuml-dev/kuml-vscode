@@ -2,7 +2,7 @@
   "name": "kuml-vscode",
   "displayName": "kUML",
   "description": "Syntax highlighting, snippets, LSP diagnostics/completion, and live-preview rendering for kUML diagram scripts (*.kuml.kts).",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publisher": "kuml-dev",
   "license": "Apache-2.0",
   "homepage": "https://kuml.dev",
@@ -14,7 +14,7 @@
     "url": "https://github.com/kuml-dev/kuml-vscode/issues"
   },
   "icon": "icons/kuml-marketplace.png",
-  "_comment_icon": "PNG required by vsce (SVGs are rejected). Generated from icons/kuml-script-dark.svg.",
+  "_comment_icon": "PNG required by vsce (SVGs are rejected). Generated from icons/kuml-brand-logo.svg via: rsvg-convert --width=256 --height=256 --keep-aspect-ratio icons/kuml-brand-logo.svg -o icons/kuml-marketplace.png. NOT from icons/kuml-script-*.svg — those are the small file-type icons for contributes.languages[0].icon.",
   "categories": [
     "Programming Languages",
     "Snippets",

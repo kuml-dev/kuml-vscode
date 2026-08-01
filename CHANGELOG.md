@@ -2,6 +2,25 @@
 
 All notable changes to the kUML VS Code extension are documented in this file.
 
+## [0.3.2] — 2026-08-01
+
+Marketplace listing icon only — no functional changes.
+
+### Fixed
+- The Marketplace listing showed a generic "kU" script glyph instead of the
+  kUML brand logo. `icons/kuml-marketplace.png` had been rasterized from
+  `icons/kuml-script-dark.svg` — the 16×16 file-type icon meant solely for
+  `contributes.languages[0].icon` — and that small monogram was reused for
+  the large listing image by mistake back in 0.2.0. It is now generated from
+  the real brand mark (navy #1d2b4f + gold #c49a2e "kUML" wordmark), vendored
+  into this repo as `icons/kuml-brand-logo.svg` from the JetBrains plugin's
+  `META-INF/pluginIcon.svg`, and rasterized to 256×256 (was 128×128) for a
+  crisper Marketplace thumbnail. The `package.json` `"icon"` path was always
+  correct and is unchanged; the misleading `_comment_icon` note that pointed
+  at the script icon as the source has been corrected so the next regeneration
+  cannot repeat the mistake. `icons/kuml-script-{light,dark}.svg` are untouched
+  and remain the file-type icons.
+
 ## [0.3.1] — 2026-07-21
 
 Internal/tooling only — no user-facing changes.
