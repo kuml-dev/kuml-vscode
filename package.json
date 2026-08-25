@@ -2,7 +2,7 @@
   "name": "kuml-vscode",
   "displayName": "kUML",
   "description": "Syntax highlighting, snippets, LSP diagnostics/completion, and live-preview rendering for kUML diagram scripts (*.kuml.kts).",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "publisher": "kuml-dev",
   "license": "Apache-2.0",
   "homepage": "https://kuml.dev",
@@ -38,8 +38,13 @@
     "languages": [
       {
         "id": "kuml",
-        "aliases": ["kUML", "kuml"],
-        "extensions": [".kuml.kts"],
+        "aliases": [
+          "kUML",
+          "kuml"
+        ],
+        "extensions": [
+          ".kuml.kts"
+        ],
         "configuration": "./language-configuration.json",
         "icon": {
           "light": "./icons/kuml-script-light.svg",
@@ -145,7 +150,8 @@
         "kuml.cliPath": {
           "type": "string",
           "default": "kuml",
-          "description": "Path to the kUML CLI executable. Defaults to `kuml` (resolved on PATH). Override if the CLI is installed in a non-standard location."
+          "scope": "machine",
+          "description": "Path to the kUML CLI executable. Defaults to `kuml` (resolved on PATH). Override if the CLI is installed in a non-standard location. Machine-scoped: a workspace's own .vscode/settings.json cannot override this, since embedded diagrams can now render just by opening a Markdown/AsciiDoc file — a workspace-writable command path would otherwise let a cloned repo choose what gets executed on your machine."
         },
         "kuml.theme": {
           "type": "string",
@@ -154,19 +160,24 @@
         },
         "kuml.format": {
           "type": "string",
-          "enum": ["svg", "png"],
+          "enum": [
+            "svg",
+            "png"
+          ],
           "default": "svg",
           "description": "Render output format used by the `kUML: Render to SVG` command. PNG is opened in the default OS viewer; SVG is opened in a VS Code preview tab."
         },
         "kuml.lspPath": {
           "type": "string",
           "default": "",
-          "description": "Explicit path to the `kuml-lsp` language server launcher. Empty resolves it automatically: PATH, Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`), `~/.local/bin`, then a local Gradle build (`kuml-language-server/build/install/kuml-lsp/bin`) — same order as the `kuml` CLI."
+          "scope": "machine",
+          "description": "Explicit path to the `kuml-lsp` language server launcher. Empty resolves it automatically: PATH, Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`), `~/.local/bin`, then a local Gradle build (`kuml-language-server/build/install/kuml-lsp/bin`) — same order as the `kuml` CLI. Machine-scoped for the same reason as kuml.cliPath."
         },
         "kuml.serverUrl": {
           "type": "string",
           "default": "",
-          "description": "Base URL of a running `kuml serve` instance (e.g. http://127.0.0.1:8080) used by the live preview for rendering. Empty makes the preview shell out to `kuml render` instead."
+          "scope": "machine",
+          "description": "Base URL of a running `kuml serve` instance (e.g. http://127.0.0.1:8080) used by the live preview for rendering. Empty makes the preview shell out to `kuml render` instead. Machine-scoped: a workspace-writable render endpoint would be an SSRF vector once diagrams can render from a Markdown/AsciiDoc preview alone."
         },
         "kuml.diagnostics.enable": {
           "type": "boolean",
@@ -178,8 +189,46 @@
           "default": 300,
           "minimum": 0,
           "description": "Debounce interval (milliseconds) between an edit and the language server re-validating the document."
+        },
+        "kuml.embed.markdown.enable": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Render ```kuml fenced code blocks as live diagrams in the built-in Markdown preview."
+        },
+        "kuml.embed.asciidoc.enable": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Render [source,kuml] blocks and kuml::path[] macros as live diagrams in the AsciiDoc preview. Requires the asciidoctor.asciidoctor-vscode extension, version 4.0.0 or later."
+        },
+        "kuml.embed.allowPathsOutsideWorkspace": {
+          "type": "boolean",
+          "default": false,
+          "scope": "machine",
+          "description": "Allow kuml::path[] macros to reference files outside the workspace folder, limited to the referencing document's own directory. Off by default."
         }
       }
+    },
+    "markdown.markdownItPlugins": true,
+    "markdown.previewStyles": [
+      "./media/kuml-embed.css"
+    ],
+    "asciidoc.asciidoctorExtensions": true,
+    "asciidoc.previewStyles": [
+      "./media/kuml-embed.css"
+    ]
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "kUML compiles and executes Kotlin script when rendering diagrams. In restricted (untrusted) workspaces, embedded diagrams in Markdown/AsciiDoc previews and the live-preview panel show a notice instead of rendering.",
+      "restrictedConfigurations": [
+        "kuml.cliPath",
+        "kuml.lspPath",
+        "kuml.serverUrl",
+        "kuml.theme"
+      ]
     }
   },
   "scripts": {
@@ -193,10 +242,13 @@
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
+    "@asciidoctor/core": "^3.0.4",
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
-    "typescript": "^5.4.0",
-    "@vscode/vsce": "^3.0.0"
+    "@vscode/vsce": "^3.0.0",
+    "markdown-it": "^14.3.0",
+    "typescript": "^5.4.0"
   },
   "_comment_overrides": "Transitive-dependency security bumps, pinned to the first patched version satisfying each parent's declared semver range; see CHANGELOG. js-yaml/fast-uri/linkify-it/form-data/undici and @vscode/vsce's own minimatch->brace-expansion are all inside @vscode/vsce's (dev-only) tree, never shipped in the packaged VSIX. vscode-languageclient's minimatch->brace-expansion IS shipped (vscode-languageclient is a production dependency) and had its own, separate CVE (GHSA-mh99-v99m-4gvg) at 2.1.2 — that one is the actual runtime-relevant fix here.",
   "overrides": {

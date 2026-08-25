@@ -1,14 +1,13 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
-import { spawnCli } from './cli';
 import { sanitizeSvg } from './svgSanitize';
+import { renderKuml } from './render/kumlRenderer';
+import { escapeHtml } from './embed/embedHtml';
 
 /**
  * Live-preview webview for `*.kuml.kts` documents.
  *
- * Render strategy (dual, in `renderFor`):
+ * Render strategy (dual, delegated to `render/kumlRenderer.ts`'s `renderKuml`):
  *  1. If `kuml.serverUrl` is set, POST to `{serverUrl}/api/render` (the
  *     `kuml serve` HTTP API — see `kuml-web`'s `RenderRequest`/`RenderResponse`).
  *  2. Otherwise (or on any failure of the above), fall back to shelling out to
@@ -18,9 +17,11 @@ import { sanitizeSvg } from './svgSanitize';
  * needed for the in-panel zoom toolbar (Zoom In/Out/Fit), but the CSP locks
  * `script-src` to a single per-render nonce, so only the inline `<script>`
  * this class generates can run; no remote scripts, no `<img src>`, and no
- * message-passing back to the extension host. The rendered SVG is still
- * static, sanitized markup inlined into the page. `sanitizeSvg` remains
- * defense-in-depth on top of that.
+ * message-passing back to the extension host. `sanitizeSvg` is the only
+ * defense against an SVG carrying active content (script/foreignObject/event
+ * handlers) — see the note on `sanitizeSvg` itself for why this is not
+ * "defense in depth" in the Markdown/AsciiDoc embed surfaces, which run with
+ * no output sanitizer of their own.
  */
 export class KumlPreviewPanel {
     private static current: KumlPreviewPanel | undefined;
@@ -88,77 +89,31 @@ export class KumlPreviewPanel {
         const theme = config.get<string>('theme', 'kuml');
         const cliPath = config.get<string>('cliPath', 'kuml');
         const script = document.getText();
+        const name = path.basename(document.uri.fsPath, '.kuml.kts') || 'diagram';
 
-        let svg: string | undefined;
-        let fallbackNote: string | undefined;
+        const outcome = await renderKuml({ source: script, theme, name, cliPath, serverUrl });
 
-        if (serverUrl) {
-            try {
-                svg = await this.renderViaServer(serverUrl, script, theme);
-            } catch (err: unknown) {
-                fallbackNote = err instanceof Error ? err.message : String(err);
-            }
-        }
-
-        if (!svg) {
-            try {
-                svg = await this.renderViaCli(cliPath, theme, script, document.uri);
-            } catch (err: unknown) {
-                const message = err instanceof Error ? err.message : String(err);
-                this.panel.webview.html = this.wrapHtml(this.errorCard(message, fallbackNote));
+        switch (outcome.kind) {
+            case 'svg': {
+                const sanitized = sanitizeSvg(outcome.svg);
+                this.panel.webview.html = this.wrapHtml(`<div class="kuml-svg">${sanitized}</div>`);
                 return;
             }
+            case 'empty':
+                this.panel.webview.html = this.wrapHtml('<p>Open a *.kuml.kts file and save it to render a preview.</p>');
+                return;
+            case 'cli-missing':
+                this.panel.webview.html = this.wrapHtml(this.errorCard(outcome.message, undefined));
+                return;
+            case 'error':
+                this.panel.webview.html = this.wrapHtml(this.errorCard(outcome.summary, outcome.detail));
+                return;
         }
-
-        const sanitized = sanitizeSvg(svg);
-        const note = fallbackNote
-            ? `<p class="kuml-note">kuml.serverUrl render failed, used CLI fallback: ${escapeHtml(fallbackNote)}</p>`
-            : '';
-        this.panel.webview.html = this.wrapHtml(`${note}<div class="kuml-svg">${sanitized}</div>`);
     }
 
-    private async renderViaServer(serverUrl: string, script: string, theme: string): Promise<string> {
-        const url = `${serverUrl.replace(/\/+$/, '')}/api/render`;
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ script, format: 'svg', theme }),
-        });
-        if (!res.ok) {
-            throw new Error(`kuml serve responded with HTTP ${res.status}`);
-        }
-        const body = (await res.json()) as { ok: boolean; svg?: string; error?: string };
-        if (!body.ok || !body.svg) {
-            throw new Error(body.error ?? 'kuml serve render returned ok=false with no error message');
-        }
-        return body.svg;
-    }
-
-    private async renderViaCli(
-        cliPath: string,
-        theme: string,
-        script: string,
-        sourceUri: vscode.Uri,
-    ): Promise<string> {
-        const baseName = path.basename(sourceUri.fsPath, '.kuml.kts') || 'diagram';
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kuml-vscode-preview-'));
-        const tmpSource = path.join(tmpDir, `${baseName}.kuml.kts`);
-        const tmpOutput = path.join(tmpDir, `${baseName}.svg`);
-        fs.writeFileSync(tmpSource, script, { encoding: 'utf8' });
-
-        await spawnCli(cliPath, ['render', '--theme', theme, '--format', 'svg', '--output', tmpOutput, tmpSource]);
-
-        if (!fs.existsSync(tmpOutput)) {
-            throw new Error(`kuml render produced no output at ${tmpOutput}.`);
-        }
-        return fs.readFileSync(tmpOutput, { encoding: 'utf8' });
-    }
-
-    private errorCard(message: string, fallbackNote: string | undefined): string {
-        const note = fallbackNote
-            ? `<p class="kuml-note">kuml.serverUrl render also failed: ${escapeHtml(fallbackNote)}</p>`
-            : '';
-        return `${note}<div class="kuml-error"><p>kUML preview render failed:</p><pre>${escapeHtml(message)}</pre></div>`;
+    private errorCard(message: string, detail: string | undefined): string {
+        const detailBlock = detail ? `<pre>${escapeHtml(detail)}</pre>` : '';
+        return `<div class="kuml-error"><p>${escapeHtml(message)}</p>${detailBlock}</div>`;
     }
 
     private wrapHtml(body: string): string {
@@ -234,15 +189,6 @@ ${body}
 </body>
 </html>`;
     }
-}
-
-function escapeHtml(s: string): string {
-    return s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
 }
 
 /** Random per-render nonce used to scope the CSP `script-src` to this panel's own inline `<script>`. */

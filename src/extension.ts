@@ -2,35 +2,91 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import type MarkdownIt from 'markdown-it';
+import type { Extensions } from '@asciidoctor/core';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { createClient, startClient, stopClient } from './lspClient';
 import { KumlPreviewPanel } from './previewPanel';
 import { spawnCli } from './cli';
+import { renderKuml } from './render/kumlRenderer';
+import { renderCache } from './render/renderCache';
+import { evaluateGate } from './embed/gateHost';
+import { scheduleRefresh, disposeRefresh } from './embed/refreshHost';
+import { createMarkdownItPlugin, type MarkdownItDeps } from './embed/markdownIt';
+import { createAsciidoctorRegistrar, type AsciidocDeps, type AsciidoctorExtensionContext } from './embed/asciidoc';
 
 /**
  * VS Code extension entry point for kUML.
  *
  * Activation contract:
- *  - The extension activates on `onLanguage:kuml` — i.e. the first time a
- *    `*.kuml.kts` file is opened. That's also when language + grammar +
- *    snippets become active, and when the LSP client starts.
- *  - Runtime commands: `kuml.renderToSvg` (one-shot render honoring the
- *    `kuml.format` setting; SVG routes into the live-preview panel, PNG opens
- *    in the OS viewer), `kuml.showPreview` (opens/reveals the live-preview
- *    webview), `kuml.exportPng` (one-shot render that always forces PNG,
- *    regardless of `kuml.format` — the toolbar's dedicated PNG-export
- *    button), and `kuml.restartServer` (stops and recreates the LSP client).
- *  - The LSP server (`kuml-lsp`) is render-agnostic — diagnostics and
- *    completion only. Live preview rendering is entirely a client-side
- *    concern (see `previewPanel.ts`'s dual server/CLI strategy).
+ *  - The extension activates on `onLanguage:kuml` (opening a `*.kuml.kts`
+ *    file) — that remains unchanged (see Stolperfalle F2 in the v0.4.0 plan:
+ *    do NOT add `onLanguage:markdown` here).
+ *  - BUT: `activate()` is now also invoked whenever VS Code's built-in
+ *    Markdown preview or asciidoctor-vscode collect
+ *    `markdown.markdownItPlugins` / `asciidoc.asciidoctorExtensions`
+ *    contributors — i.e. potentially on opening ANY Markdown/AsciiDoc file,
+ *    regardless of whether a `*.kuml.kts` file was ever opened. The LSP
+ *    client (a JVM process) must NOT start in that case — see
+ *    `ensureLspStarted` below, the single most important change in this
+ *    release (Stolperfalle F1).
+ *  - Runtime commands: `kuml.renderToSvg`, `kuml.showPreview`,
+ *    `kuml.exportPng`, `kuml.restartServer` — unchanged.
+ *  - The exported `extendMarkdownIt` / `registerAsciidoctorExtensions`
+ *    functions are how VS Code's Markdown preview and asciidoctor-vscode
+ *    (>= 4.0.0) pick up live kUML diagram rendering.
  */
 
 let client: LanguageClient | undefined;
+let lspStarted = false;
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
-    client = createClient(context);
-    void startClient(client);
-    context.subscriptions.push({ dispose: () => void stopClient(client) });
+export interface KumlExtensionApi {
+    extendMarkdownIt(md: MarkdownIt): MarkdownIt;
+    registerAsciidoctorExtensions(registry: Extensions.Registry, context: AsciidoctorExtensionContext): Promise<void>;
+}
+
+// IMPORTANT: VS Code's built-in Markdown extension reads `extendMarkdownIt`
+// directly off this module's exports (`module.exports.extendMarkdownIt`)
+// AFTER awaiting `activate()`, not off `activate()`'s return value — verified
+// against the built-in `markdown-language-features` extension's source
+// (`M.activate().then(() => M.exports?.extendMarkdownIt ? ... )`). Same
+// pattern for asciidoctor-vscode's `registerAsciidoctorExtensions`. These two
+// MUST therefore be plain top-level exports, built from the real `vscode`-
+// backed dependencies at module load time — not something `activate()`
+// assembles and returns.
+const markdownDeps: MarkdownItDeps = {
+    evaluateGate: (uri) => evaluateGate('markdown', uri as vscode.Uri | undefined),
+    scheduleRefresh: () => scheduleRefresh('markdown'),
+    cache: renderCache,
+    render: renderKuml,
+};
+
+const asciidocDeps: AsciidocDeps = {
+    evaluateGate: (uri) => evaluateGate('asciidoc', uri as vscode.Uri | undefined),
+    scheduleRefresh: () => scheduleRefresh('asciidoc'),
+    cache: renderCache,
+    render: renderKuml,
+    readDocumentText: async (uri) => readDocumentTextLive(uri as vscode.Uri),
+};
+
+export const extendMarkdownIt = createMarkdownItPlugin(markdownDeps);
+export const registerAsciidoctorExtensions = createAsciidoctorRegistrar(asciidocDeps);
+
+export async function activate(context: vscode.ExtensionContext): Promise<KumlExtensionApi> {
+    // Lazy LSP: only start the kuml-lsp JVM if a kUML document is already
+    // open at activation time, or gets opened later. Activating this
+    // extension no longer implies "the user is working with kUML" — it also
+    // happens for anyone with a Markdown or AsciiDoc file open (F1).
+    if (vscode.workspace.textDocuments.some((d) => d.languageId === 'kuml')) {
+        ensureLspStarted(context);
+    }
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument((doc) => {
+            if (doc.languageId === 'kuml') {
+                ensureLspStarted(context);
+            }
+        }),
+    );
 
     context.subscriptions.push(
         vscode.commands.registerCommand('kuml.renderToSvg', () => renderActiveDocument()),
@@ -49,15 +105,69 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
         }),
     );
+
+    context.subscriptions.push(
+        vscode.workspace.onDidGrantWorkspaceTrust(() => {
+            renderCache.clear();
+            scheduleRefresh('markdown');
+            scheduleRefresh('asciidoc');
+        }),
+        vscode.workspace.onDidChangeConfiguration((e) => {
+            if (
+                e.affectsConfiguration('kuml.theme') ||
+                e.affectsConfiguration('kuml.cliPath') ||
+                e.affectsConfiguration('kuml.serverUrl') ||
+                e.affectsConfiguration('kuml.embed')
+            ) {
+                renderCache.clear();
+                scheduleRefresh('markdown');
+                scheduleRefresh('asciidoc');
+            }
+        }),
+    );
+
+    return { extendMarkdownIt, registerAsciidoctorExtensions };
 }
 
 export async function deactivate(): Promise<void> {
+    disposeRefresh();
     KumlPreviewPanel.disposeAll();
     await stopClient(client);
 }
 
+/**
+ * Reads a document's live (possibly-dirty) text for the AsciiDoc export
+ * pre-render pass. Checks already-open `TextDocument`s first — an unsaved
+ * buffer must win over the on-disk copy (Stolperfalle F11) — falling back to
+ * `workspace.fs.readFile` for a document that isn't open in any editor.
+ */
+async function readDocumentTextLive(uri: vscode.Uri): Promise<string | undefined> {
+    const open = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+    if (open) {
+        return open.getText();
+    }
+    try {
+        const bytes = await vscode.workspace.fs.readFile(uri);
+        return Buffer.from(bytes).toString('utf8');
+    } catch {
+        return undefined;
+    }
+}
+
+/** Idempotent: starts the LSP client at most once per extension host lifetime. */
+function ensureLspStarted(context: vscode.ExtensionContext): void {
+    if (lspStarted) {
+        return;
+    }
+    lspStarted = true;
+    client = createClient(context);
+    void startClient(client);
+    context.subscriptions.push({ dispose: () => void stopClient(client) });
+}
+
 async function restartServer(context: vscode.ExtensionContext): Promise<void> {
     await stopClient(client);
+    lspStarted = true;
     client = createClient(context);
     await startClient(client);
     await vscode.window.showInformationMessage('kUML language server restarted.');

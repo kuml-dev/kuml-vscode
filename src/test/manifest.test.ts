@@ -168,3 +168,77 @@ test('grammar covers every spec-mandated DSL entry-point keyword', () => {
 test('extension activates only on the kuml language to keep startup cheap', () => {
     assert.deepEqual(MANIFEST.activationEvents, ['onLanguage:kuml']);
 });
+
+test('manifest contributes both markdown and asciidoc embed hook points', () => {
+    const contributes = MANIFEST.contributes as Record<string, unknown>;
+    assert.equal(contributes['markdown.markdownItPlugins'], true);
+    assert.equal(contributes['asciidoc.asciidoctorExtensions'], true);
+});
+
+test('markdown.previewStyles and asciidoc.previewStyles both point at an existing stylesheet', () => {
+    const contributes = MANIFEST.contributes as Record<string, string[]>;
+    for (const key of ['markdown.previewStyles', 'asciidoc.previewStyles']) {
+        const styles = contributes[key];
+        assert.ok(Array.isArray(styles) && styles.length > 0, `${key} must be a non-empty array`);
+        for (const style of styles) {
+            assert.ok(fs.existsSync(path.join(ROOT, style)), `${key} entry ${style} must exist on disk`);
+        }
+    }
+});
+
+test('manifest declares untrustedWorkspaces capability as "limited" with the render-affecting settings restricted', () => {
+    const capabilities = MANIFEST.capabilities as Record<string, unknown> | undefined;
+    assert.ok(capabilities, 'manifest must declare a "capabilities" block');
+    const untrusted = capabilities!.untrustedWorkspaces as { supported: string; restrictedConfigurations: string[] };
+    assert.equal(untrusted.supported, 'limited');
+    for (const key of ['kuml.cliPath', 'kuml.lspPath', 'kuml.serverUrl', 'kuml.theme']) {
+        assert.ok(untrusted.restrictedConfigurations.includes(key), `${key} must be in restrictedConfigurations`);
+    }
+});
+
+test('kuml.cliPath, kuml.lspPath, kuml.serverUrl are machine-scoped (cannot be set from a workspace)', () => {
+    const props = MANIFEST.contributes.configuration.properties as Record<string, Record<string, unknown>>;
+    for (const key of ['kuml.cliPath', 'kuml.lspPath', 'kuml.serverUrl']) {
+        assert.equal(props[key].scope, 'machine', `${key} must be scope:"machine"`);
+    }
+});
+
+test('the three kuml.embed.* settings exist with the expected type/scope/default', () => {
+    const props = MANIFEST.contributes.configuration.properties as Record<string, Record<string, unknown>>;
+
+    assert.equal(props['kuml.embed.markdown.enable'].type, 'boolean');
+    assert.equal(props['kuml.embed.markdown.enable'].default, true);
+    assert.equal(props['kuml.embed.markdown.enable'].scope, 'resource');
+
+    assert.equal(props['kuml.embed.asciidoc.enable'].type, 'boolean');
+    assert.equal(props['kuml.embed.asciidoc.enable'].default, true);
+    assert.equal(props['kuml.embed.asciidoc.enable'].scope, 'resource');
+
+    assert.equal(props['kuml.embed.allowPathsOutsideWorkspace'].type, 'boolean');
+    assert.equal(props['kuml.embed.allowPathsOutsideWorkspace'].default, false);
+    assert.equal(props['kuml.embed.allowPathsOutsideWorkspace'].scope, 'machine');
+});
+
+test('markdown-it and @asciidoctor/core are devDependencies, never runtime dependencies', () => {
+    const deps = (MANIFEST.dependencies as Record<string, string> | undefined) ?? {};
+    const devDeps = (MANIFEST.devDependencies as Record<string, string> | undefined) ?? {};
+    for (const pkg of ['markdown-it', '@asciidoctor/core']) {
+        assert.ok(devDeps[pkg], `${pkg} must be a devDependency`);
+        assert.ok(!deps[pkg], `${pkg} must NOT be a runtime dependency (it is type-only / test-only)`);
+    }
+});
+
+test('the compiled bundle never actually requires @asciidoctor/core (type-only import, F7)', () => {
+    const compiledAsciidoc = path.join(ROOT, 'out', 'embed', 'asciidoc.js');
+    if (!fs.existsSync(compiledAsciidoc)) {
+        // Compilation is a prerequisite this test can't enforce itself; skip
+        // quietly rather than failing a fresh checkout that hasn't run `npm
+        // run compile` yet. CI always compiles before testing.
+        return;
+    }
+    const compiled = fs.readFileSync(compiledAsciidoc, 'utf8');
+    assert.ok(
+        !/require\(["']@asciidoctor\/core["']\)/.test(compiled),
+        'out/embed/asciidoc.js must not require("@asciidoctor/core") at runtime — it is a type-only import',
+    );
+});

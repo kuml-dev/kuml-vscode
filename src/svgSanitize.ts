@@ -1,12 +1,23 @@
 /**
- * Sanitizes a `kuml render`-produced SVG string before it is inlined into the
- * live-preview webview. This is defense-in-depth on top of the webview's
- * nonce-scoped CSP (`script-src 'nonce-<random>'` — only the panel's own
- * inline zoom-toolbar script can run, see `previewPanel.ts`) — the SVG is a
- * static asset, not attacker-controlled input in the usual sense (it comes
- * from the local CLI or a locally-configured `kuml.serverUrl`), but stripping
- * active content keeps the preview safe even if a future renderer
- * regression, plugin, or theme accidentally emits something it shouldn't.
+ * Sanitizes a `kuml render`-produced SVG string before it is inlined into
+ * any of the three surfaces that embed it: the live-preview webview
+ * (`previewPanel.ts`), the built-in Markdown preview (`embed/markdownIt.ts`),
+ * and the AsciiDoc preview (`embed/asciidoc.ts`).
+ *
+ * In the live-preview webview this genuinely is defense-in-depth on top of
+ * the panel's nonce-scoped CSP (`script-src 'nonce-<random>'` — only the
+ * panel's own inline zoom-toolbar script can run).
+ *
+ * In the Markdown and AsciiDoc previews it is NOT defense-in-depth — it is
+ * the *only* line of defense. VS Code's built-in Markdown preview renders
+ * with `html: true` and no DOMPurify/output sanitizer of its own (verified
+ * against `markdown-language-features`), and nothing in the AsciiDoc preview
+ * pipeline re-sanitizes a `pass` block's raw HTML either. If this function
+ * ever stops running before an SVG reaches either of those two webviews, an
+ * SVG carrying `<script>`, `<foreignObject>`, or `on*` handlers renders with
+ * full script execution in an unsandboxed(-by-us) context. Do not remove
+ * this call from `embed/markdownIt.ts` / `embed/asciidoc.ts` with the
+ * (outdated) reasoning that it's "just" a defense-in-depth layer.
  *
  * No `vscode` import here — kept pure so it's unit-testable in plain Node.
  */

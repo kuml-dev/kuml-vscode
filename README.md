@@ -77,6 +77,52 @@ Only SVG is inlined into the webview; PNG output from `kuml.renderToSvg` (or
 the dedicated `kuml.exportPng` command) still opens in your OS's default
 image viewer.
 
+## Diagrams in Markdown and AsciiDoc
+
+kUML diagrams also render live inside VS Code's built-in **Markdown preview**
+and, if you have the
+[asciidoctor.asciidoctor-vscode](https://marketplace.visualstudio.com/items?itemName=asciidoctor.asciidoctor-vscode)
+extension installed (version 4.0.0 or later), the **AsciiDoc preview** — no
+separate command needed, just open the preview.
+
+**Markdown** — a fenced code block with the `kuml` info string:
+
+````markdown
+```kuml {theme="plain" name="login" width=800}
+umlModel {
+    classOf("User") { attribute("email", "String") }
+}
+```
+````
+
+Attributes are optional and can also be written without braces
+(`` ```kuml theme=plain ``).
+
+**AsciiDoc** — either an inline `[source,kuml]` listing block, or a
+`kuml::path[]` macro pointing at an existing `.kuml.kts` file (path resolved
+relative to the referencing document):
+
+```asciidoc
+[source,kuml,name="login",width=800]
+----
+umlModel {
+    classOf("User") { attribute("email", "String") }
+}
+----
+
+kuml::diagrams/login.kuml.kts[width=800]
+```
+
+Both surfaces share three settings — `kuml.embed.markdown.enable`,
+`kuml.embed.asciidoc.enable`, and `kuml.embed.allowPathsOutsideWorkspace` —
+see the table below.
+
+**Restricted (untrusted) workspaces**: embedded diagrams do not render there.
+kUML compiles and executes Kotlin script when rendering, and unlike opening a
+`.kuml.kts` file yourself, a diagram embedded in someone else's README can
+render just by *opening the preview* — so this path stays off until you
+explicitly trust the workspace.
+
 ## Settings
 
 | Setting                        | Default | Description                                                                                                          |
@@ -88,6 +134,15 @@ image viewer.
 | `kuml.serverUrl`                | `""`    | Base URL of a running `kuml serve` instance used by the live preview. Empty makes the preview shell out to `kuml render` instead. |
 | `kuml.diagnostics.enable`       | `true`  | Enable push diagnostics from the language server.                                                                    |
 | `kuml.diagnostics.debounceMs`   | `300`   | Debounce interval (ms) between an edit and the server re-validating the document.                                    |
+| `kuml.embed.markdown.enable`    | `true`  | Render ` ```kuml ` fenced code blocks as live diagrams in the built-in Markdown preview.                             |
+| `kuml.embed.asciidoc.enable`    | `true`  | Render `[source,kuml]` blocks and `kuml::path[]` macros as live diagrams in the AsciiDoc preview (requires asciidoctor.asciidoctor-vscode ≥ 4.0.0). |
+| `kuml.embed.allowPathsOutsideWorkspace` | `false` | Allow `kuml::path[]` macros to reference files outside the workspace folder, limited to the referencing document's own directory. |
+
+`kuml.cliPath`, `kuml.lspPath`, and `kuml.serverUrl` are machine-scoped: they
+cannot be overridden by a workspace's own `.vscode/settings.json`. That's
+intentional — a diagram embedded in Markdown/AsciiDoc can now render just by
+opening a preview, so a workspace-writable command path or render endpoint
+would let a cloned repo choose what runs on your machine.
 
 ## Out of scope
 
@@ -97,6 +152,8 @@ trying to be a full IDE. The following are deliberately left out for now:
 - Hover, go-to-definition, rename, and code actions.
 - Any custom render request on the LSP itself — the server stays
   render-agnostic; all rendering is a client-side concern.
+- Click-to-zoom / lightbox on embedded Markdown/AsciiDoc diagrams — for that,
+  use the dedicated **kUML: Open Live Preview** panel instead.
 
 For OCL validation and code generation, use the
 [`dev.kuml` Gradle plugin](https://kuml.dev/#gradle) or the CLI directly.

@@ -1,0 +1,142 @@
+/*
+ * Styles for kUML diagrams embedded in the built-in Markdown preview and the
+ * AsciiDoc preview (asciidoctor.asciidoctor-vscode). Loaded via both
+ * `markdown.previewStyles` and `asciidoc.previewStyles` — the same rules
+ * apply in either surface. All colors go through `--vscode-*` custom
+ * properties with a plain fallback, since a bare stylesheet like this one has
+ * no build step to branch on light/dark.
+ */
+
+.kuml-embed {
+    margin: 1.5em 0;
+    max-width: 100%;
+    font-family: var(--vscode-font-family, sans-serif);
+    color: var(--vscode-foreground, inherit);
+}
+
+.kuml-embed--diagram {
+    border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+    border-radius: 6px;
+    overflow: auto;
+    padding: 8px;
+    box-sizing: border-box;
+    width: var(--kuml-width, auto);
+}
+
+.kuml-embed--diagram svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+}
+
+/* Skeleton placeholder: reserves space immediately so the preview doesn't
+   jump once the real diagram (or an error card) replaces it. */
+.kuml-embed--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--kuml-reserved-h, 180px);
+    border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+    border-radius: 6px;
+    background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
+}
+
+/* The activity dots fade in only after 400ms — a warm cache never shows them,
+   avoiding a flash of "loading" for the common case. */
+.kuml-embed__dots {
+    display: inline-flex;
+    gap: 4px;
+    opacity: 0;
+    animation: kuml-embed-fade-in 0.2s ease-out 400ms forwards;
+}
+
+.kuml-embed__dots i {
+    display: block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--vscode-descriptionForeground, #999);
+    animation: kuml-embed-pulse 1.2s ease-in-out infinite;
+}
+
+.kuml-embed__dots i:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.kuml-embed__dots i:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes kuml-embed-fade-in {
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes kuml-embed-pulse {
+    0%,
+    80%,
+    100% {
+        opacity: 0.3;
+        transform: scale(0.85);
+    }
+    40% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kuml-embed__dots {
+        opacity: 1;
+        animation: none;
+    }
+    .kuml-embed__dots i {
+        animation: none;
+        opacity: 0.6;
+    }
+}
+
+/* Error / CLI-missing / restricted / budget notices share one look: a left
+   warning triangle (inline SVG, currentColor) plus message text. */
+.kuml-embed--notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+    border-radius: 6px;
+    background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
+    font-size: 0.95em;
+}
+
+.kuml-embed--notice svg {
+    flex: none;
+    margin-top: 0.15em;
+    color: var(--vscode-descriptionForeground, #999);
+}
+
+.kuml-embed--error svg {
+    color: var(--vscode-errorForeground, #f48771);
+}
+
+.kuml-embed--notice pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 6px 0 0;
+    font-size: 0.9em;
+}
+
+.kuml-embed--notice code {
+    font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.kuml-embed--notice details {
+    margin-top: 4px;
+}
+
+.kuml-embed--notice summary {
+    cursor: pointer;
+    color: var(--vscode-descriptionForeground, #999);
+}
