@@ -2,6 +2,17 @@
 
 All notable changes to the kUML VS Code extension are documented in this file.
 
+## [0.3.4] — 2026-08-25
+
+Marketplace listing only — no code changes.
+
+### Added
+- **README screenshots**: five side-by-side source/live-preview screenshots
+  (class, sequence, state, activity, deployment diagrams) so the Marketplace
+  listing shows the extension in action instead of describing it in text
+  alone. Images are hosted via `raw.githubusercontent.com` and excluded from
+  the packaged VSIX (`.vscodeignore`) to keep it lean.
+
 ## [0.3.3] — 2026-08-01
 
 Dependency security bumps — no user-facing functional changes.

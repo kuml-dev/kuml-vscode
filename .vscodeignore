@@ -1,5 +1,8 @@
 .vscode/**
 .vscode-test/**
+# README screenshots are embedded via raw.githubusercontent.com URLs, not
+# packaged assets — excluded to keep the VSIX lean.
+docs/**
 src/**
 out/test/**
 .gitignore

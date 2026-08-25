@@ -3,6 +3,21 @@
 First-class editor support for [kUML](https://kuml.dev) diagram scripts
 (`*.kuml.kts`) in Visual Studio Code.
 
+## Screenshots
+
+Source on the left, live-rendered SVG preview on the right — for every kUML
+diagram type.
+
+<img src="https://raw.githubusercontent.com/kuml-dev/kuml-vscode/master/docs/screenshots/vscode-class-diagram.png" alt="UML class diagram: order-domain.kuml.kts source next to its live-rendered SVG preview, showing Customer, Order, OrderItem, Subscription and a Payable interface" width="800"/>
+
+<img src="https://raw.githubusercontent.com/kuml-dev/kuml-vscode/master/docs/screenshots/vscode-sequence-diagram.png" alt="UML sequence diagram: place-order.kuml.kts source next to its live-rendered SVG preview, showing a Place Order flow with alt/opt fragments across Customer, Frontend, OrderAPI, StockService, PaymentService and OrderDatabase" width="800"/>
+
+<img src="https://raw.githubusercontent.com/kuml-dev/kuml-vscode/master/docs/screenshots/vscode-state-diagram.png" alt="UML state machine diagram: order-lifecycle.kuml.kts source next to its live-rendered SVG preview, showing an Order Lifecycle state machine with a composite Processing state" width="800"/>
+
+<img src="https://raw.githubusercontent.com/kuml-dev/kuml-vscode/master/docs/screenshots/vscode-activity-diagram.png" alt="UML activity diagram: order-checkout.kuml.kts source next to its live-rendered SVG preview, showing an Order checkout flow with a decision branch" width="800"/>
+
+<img src="https://raw.githubusercontent.com/kuml-dev/kuml-vscode/master/docs/screenshots/vscode-deployment-diagram.png" alt="UML deployment diagram: aws-eks.kuml.kts source next to its live-rendered SVG preview, showing an AWS deployment with a VPC, EKS cluster, RDS PostgreSQL and an S3 bucket" width="800"/>
+
 ## Features
 
 - **Syntax highlighting** for the kUML DSL on top of Kotlin script syntax —
